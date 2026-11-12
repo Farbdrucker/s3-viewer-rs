@@ -1,11 +1,34 @@
 # S3 Viewer
 
+[![CI](https://github.com/Farbdrucker/s3-viewer-rs/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Farbdrucker/s3-viewer-rs/actions/workflows/ci.yml)
+[![Tests](https://github.com/Farbdrucker/s3-viewer-rs/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/Farbdrucker/s3-viewer-rs/actions/workflows/tests.yml)
+[![Builds](https://github.com/Farbdrucker/s3-viewer-rs/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/Farbdrucker/s3-viewer-rs/actions/workflows/release.yml)
+[![Latest release](https://img.shields.io/github/v/release/Farbdrucker/s3-viewer-rs?label=release)](https://github.com/Farbdrucker/s3-viewer-rs/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/Farbdrucker/s3-viewer-rs/total)](https://github.com/Farbdrucker/s3-viewer-rs/releases)
+[![Rust 1.95+](https://img.shields.io/badge/rust-1.95%2B-orange?logo=rust)](https://www.rust-lang.org)
+[![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20Windows%20%7C%20macOS-blue)](#download)
+[![License: MIT](https://img.shields.io/github/license/Farbdrucker/s3-viewer-rs)](LICENSE)
+
 Desktop program for browsing buckets of OpenStack and other S3-compatible object stores,
 written in pure Rust. Runs on Linux, Windows and macOS, on x86_64 and ARM64.
 
 It replaces the earlier Python/Qt version and keeps all of its features. Saved connections
 (`~/.s3-viewer/connections.json`) are read as they are, and the remembered form values
 of the old version are taken over on first start.
+
+## Download
+
+Builds of the latest release:
+
+| | x86_64 (Intel/AMD) | ARM64 |
+| --- | --- | --- |
+| **Linux** | [s3-viewer-linux-x86_64.tar.gz](https://github.com/Farbdrucker/s3-viewer-rs/releases/latest/download/s3-viewer-linux-x86_64.tar.gz) | [s3-viewer-linux-arm64.tar.gz](https://github.com/Farbdrucker/s3-viewer-rs/releases/latest/download/s3-viewer-linux-arm64.tar.gz) |
+| **Windows** | [s3-viewer-windows-x86_64.zip](https://github.com/Farbdrucker/s3-viewer-rs/releases/latest/download/s3-viewer-windows-x86_64.zip) | [s3-viewer-windows-arm64.zip](https://github.com/Farbdrucker/s3-viewer-rs/releases/latest/download/s3-viewer-windows-arm64.zip) |
+| **macOS** | [s3-viewer-macos-x86_64.zip](https://github.com/Farbdrucker/s3-viewer-rs/releases/latest/download/s3-viewer-macos-x86_64.zip) (Intel) | [s3-viewer-macos-arm64.zip](https://github.com/Farbdrucker/s3-viewer-rs/releases/latest/download/s3-viewer-macos-arm64.zip) (Apple Silicon) |
+
+Older versions are on the [releases page](https://github.com/Farbdrucker/s3-viewer-rs/releases). Unpack and start `s3-viewer`
+(`s3-viewer.exe`, or `S3 Viewer.app` on macOS: the app is not notarised, so open it the
+first time with right-click → Open).
 
 ## Features
 
@@ -137,10 +160,20 @@ desktop portal, or `zenity` when no portal is running. The program renders with 
 (Vulkan/Metal/DirectX 12) and falls back to OpenGL automatically; `S3VIEWER_RENDERER=glow`
 forces OpenGL.
 
-The GitHub Actions workflow in `.github/workflows/build.yml` tests the code and builds
-release archives for Linux, Windows and macOS on x86_64 and ARM64. Pushing a tag `v*`
-attaches them to a GitHub release. The macOS archive contains `S3 Viewer.app` (ad-hoc
-signed; on first start use right-click → Open).
+## Versions and releases
+
+The version in `Cargo.toml` follows [semantic versioning](https://semver.org): every
+merged fix raises the patch number (2.0.0 → 2.0.1), every new feature the minor number
+(2.0.1 → 2.1.0), incompatible changes the major number.
+
+GitHub Actions (`.github/workflows/`):
+
+- **CI** checks formatting and runs clippy on every push and pull request.
+- **Tests** runs the unit tests and the S3 integration tests against SeaweedFS.
+- **Builds** runs on every merge to `main`: tests, then release builds for Linux, Windows
+  and macOS on x86_64 and ARM64. If `v<version>` is not tagged yet, it creates that tag
+  and a GitHub release with the archives, which the download links above point to.
+  Without a version bump the builds are only kept as workflow artifacts.
 
 ## Tests
 
