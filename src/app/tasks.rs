@@ -55,6 +55,8 @@ pub enum Channel {
     Upload,
     SaveText,
     Check,
+    Delete,
+    NewFolder,
 }
 
 /// Bytes (or files) done and planned for the running transfer, shared with the worker.

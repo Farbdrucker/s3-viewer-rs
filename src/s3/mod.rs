@@ -23,7 +23,8 @@ pub use listing::{BucketInfo, ObjectEntry};
 
 use crate::tr;
 use listing::{
-    ListPage, dedupe_entries, entries_from_listing, file_records, parse_buckets, parse_list_page, sort_entries,
+    ListPage, dedupe_entries, entries_from_listing, file_records, object_keys, parse_buckets, parse_list_page,
+    sort_entries,
 };
 
 pub const MAX_LISTED: usize = 5000;
@@ -349,11 +350,12 @@ impl Session {
             SignatureVersion::V2 => {
                 let date = httpdate::fmt_http_date(now.into());
                 let content_type = header_value(&headers, "content-type").unwrap_or_default();
+                let content_md5 = header_value(&headers, "content-md5").unwrap_or_default();
                 let authorization = sign::V2 {
                     method: request.method,
                     resource_path: &sign::encode_path(&v2_resource),
                     query: &request.query,
-                    content_md5: "",
+                    content_md5: &content_md5,
                     content_type: &content_type,
                     date: &date,
                     amz_headers: &headers,
@@ -535,6 +537,25 @@ impl Session {
             match next {
                 Some(next) => token = Some(next),
                 None => return Ok((records, false)),
+            }
+        }
+    }
+
+    /// All keys below a prefix, folder placeholders included (for deleting a folder).
+    pub fn list_object_keys(&self, bucket: &str, prefix: &str) -> S3Result<(Vec<String>, bool)> {
+        let prefix = folder_prefix(prefix);
+        let mut keys = Vec::new();
+        let mut token: Option<String> = None;
+        loop {
+            let (page, next) = self.page(bucket, &prefix, None, token.as_deref(), PAGE_SIZE)?;
+            keys.extend(object_keys(&prefix, &page));
+            if keys.len() >= MAX_LISTED {
+                keys.truncate(MAX_LISTED);
+                return Ok((keys, true));
+            }
+            match next {
+                Some(next) => token = Some(next),
+                None => return Ok((keys, false)),
             }
         }
     }
@@ -741,6 +762,80 @@ impl Session {
     pub fn put_bytes(&self, bucket: &str, key: &str, data: &[u8], content_type: &str) -> S3Result<()> {
         let request = Request::new("PUT", Some(bucket), Some(key)).header("content-type", content_type);
         self.send(&request, Payload::Bytes(data)).map(|_| ())
+    }
+
+    /// Creates the empty `name/` object that makes a folder show up in listings.
+    pub fn create_folder(&self, bucket: &str, key: &str) -> S3Result<()> {
+        let marker = if key.ends_with('/') { key.to_owned() } else { format!("{key}/") };
+        self.send(&Request::new("PUT", Some(bucket), Some(&marker)), Payload::Empty).map(|_| ())
+    }
+
+    /// Deletes the keys, 1000 per DeleteObjects request. Endpoints without
+    /// DeleteObjects get one DELETE per key. Returns the number of deleted keys.
+    pub fn delete_keys(
+        &self,
+        bucket: &str,
+        keys: &[String],
+        progress: &dyn Fn(u64),
+        cancel: &CancelFlag,
+    ) -> S3Result<usize> {
+        let mut seen = std::collections::HashSet::new();
+        let unique: Vec<&String> = keys.iter().filter(|key| !key.is_empty() && seen.insert(key.as_str())).collect();
+        let mut batch = true;
+        for chunk in unique.chunks(1000) {
+            cancel.check()?;
+            if batch {
+                match self.delete_batch(bucket, chunk) {
+                    Ok(()) => {
+                        progress(chunk.len() as u64);
+                        continue;
+                    }
+                    Err(error) if error.unsupported() => batch = false,
+                    Err(error) => return Err(error),
+                }
+            }
+            for key in chunk {
+                cancel.check()?;
+                match self.send(&Request::new("DELETE", Some(bucket), Some(key)), Payload::Empty) {
+                    Ok(_) => {}
+                    Err(error) if error.is_not_found() => {}
+                    Err(error) => return Err(error),
+                }
+                progress(1);
+            }
+        }
+        Ok(unique.len())
+    }
+
+    fn delete_batch(&self, bucket: &str, keys: &[&String]) -> S3Result<()> {
+        use base64::Engine as _;
+        use md5::Digest as _;
+        let mut body = String::from("<Delete><Quiet>true</Quiet>");
+        for key in keys {
+            body.push_str(&format!("<Object><Key>{}</Key></Object>", crate::xml::escape(key)));
+        }
+        body.push_str("</Delete>");
+        let md5 = base64::engine::general_purpose::STANDARD.encode(md5::Md5::digest(body.as_bytes()));
+        let request = Request::new("POST", Some(bucket), None)
+            .query("delete", "")
+            .header("content-md5", md5)
+            .header("content-type", "application/xml");
+        let mut response = self.send(&request, Payload::Bytes(body.as_bytes()))?;
+        let mut answer = Vec::new();
+        response.body_mut().as_reader().take(16 * 1024 * 1024).read_to_end(&mut answer)?;
+        // Quiet mode only reports failures. Keys that are already gone are fine.
+        let root = parse_xml(&answer)?;
+        let failure = root
+            .children_named("Error")
+            .find(|error| !matches!(error.child_text("Code").as_deref(), Some("NoSuchKey") | Some("404") | None));
+        match failure {
+            None => Ok(()),
+            Some(error) => Err(S3Error::Service {
+                status: 403,
+                code: error.child_text("Code").unwrap_or_default(),
+                message: error.child_text("Message").unwrap_or_default(),
+            }),
+        }
     }
 }
 

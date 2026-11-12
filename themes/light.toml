@@ -47,6 +47,9 @@ code_text = "#e5e7eb"
 gutter_bg = "#0b1220"       # line numbers
 gutter_text = "#94a3b8"
 image_bg = "#1f2937"        # behind images and GeoTIFFs
+connected_bg = "#bbf7d0"    # connect button while connected
+connected_text = "#14532d"
+connected_line = "#4ade80"
 
 [syntax]
 key = "#7dd3fc"

@@ -70,6 +70,15 @@ fn folder_key(prefix: &str) -> String {
     if prefix.is_empty() || prefix.ends_with('/') { prefix.to_owned() } else { format!("{prefix}/") }
 }
 
+/// Key of the placeholder object for a new folder `name` below `prefix`.
+pub fn folder_marker_key(prefix: &str, name: &str) -> Result<String, String> {
+    let cleaned = name.split_whitespace().collect::<Vec<_>>().join(" ");
+    if cleaned.is_empty() || cleaned == "." || cleaned == ".." || cleaned.contains('/') || cleaned.contains('\\') {
+        return Err(tr!("new_folder_invalid"));
+    }
+    Ok(format!("{}{cleaned}/", folder_key(prefix)))
+}
+
 pub fn upload_key(prefix: &str, local_path: &Path) -> Result<String, String> {
     let name = local_path.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default();
     if name.is_empty() || name == "." || name == ".." || name.contains('/') || name.contains('\\') {
@@ -199,6 +208,15 @@ mod tests {
         std::fs::write(dir.join("f (2).txt"), b"x").unwrap();
         assert_eq!(unique_path(&path), dir.join("f (3).txt"));
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn folder_markers() {
+        assert_eq!(folder_marker_key("data", "  new   maps ").unwrap(), "data/new maps/");
+        assert_eq!(folder_marker_key("", "x").unwrap(), "x/");
+        for bad in ["", "  ", "..", "a/b", "a\\b"] {
+            assert!(folder_marker_key("", bad).is_err(), "{bad:?}");
+        }
     }
 
     #[test]

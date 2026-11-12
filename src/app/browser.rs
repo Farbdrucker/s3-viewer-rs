@@ -76,11 +76,19 @@ impl App {
                 if widgets::icon_button(ui, &theme, "🔄", &tr!("refresh"), connected).clicked() {
                     self.refresh();
                 }
+                if widgets::icon_button(ui, &theme, "📁+", &tr!("new_folder_tip"), can_upload).clicked() {
+                    self.ask_new_folder();
+                }
                 if widgets::icon_button(ui, &theme, "📂", &tr!("upload_folder_tip"), can_upload).clicked() {
                     self.upload_folder();
                 }
                 if widgets::icon_button(ui, &theme, "⬆🗋", &tr!("upload_tip"), can_upload).clicked() {
                     self.upload_files();
+                }
+                if widgets::icon_button(ui, &theme, "🗑", &tr!("delete_tip"), has_selection && self.transfer.is_none())
+                    .clicked()
+                {
+                    self.delete_selected();
                 }
                 if widgets::icon_button(
                     ui,
@@ -164,7 +172,7 @@ impl App {
     fn table_ui(&mut self, ui: &mut Ui, visible: &[usize]) {
         let theme = self.theme.clone();
         let row_height = theme.shape.row_height;
-        let mut clicked: Option<usize> = None;
+        let mut clicked: Option<(usize, bool)> = None;
         let mut sort_by: Option<SortColumn> = None;
         let scroll_target = if std::mem::take(&mut self.scroll_to_current) {
             self.current_index().and_then(|index| visible.iter().position(|&v| v == index))
@@ -244,8 +252,11 @@ impl App {
                         }
                     }
                     let tip = entry.map(|entry| entry.key.clone()).unwrap_or_else(|| tr!("parent_folder"));
-                    if row.response().on_hover_text(tip).clicked() {
-                        clicked = Some(index);
+                    let response = row.response().on_hover_text(tip);
+                    if response.double_clicked() {
+                        clicked = Some((index, true));
+                    } else if response.clicked() {
+                        clicked = Some((index, false));
                     }
                 });
             });
@@ -253,12 +264,17 @@ impl App {
             self.sort = if self.sort.0 == column { (column, !self.sort.1) } else { (column, true) };
             self.sort_rows();
         }
-        if let Some(index) = clicked {
-            self.click_row(ui.ctx(), index, visible);
+        if let Some((index, double)) = clicked {
+            self.click_row(ui.ctx(), index, visible, double);
         }
     }
 
-    fn click_row(&mut self, ctx: &egui::Context, index: usize, visible: &[usize]) {
+    /// A click selects and previews; a double-click opens folders (and goes up on "..").
+    fn click_row(&mut self, ctx: &egui::Context, index: usize, visible: &[usize], double: bool) {
+        if double {
+            self.activate(index, true);
+            return;
+        }
         let modifiers = ctx.input(|input| input.modifiers);
         let Some(key) = self.row_key(index) else { return };
         if modifiers.shift
@@ -280,8 +296,7 @@ impl App {
             self.anchor = Some(key.clone());
         }
         self.current = Some(key);
-        let navigate = !(modifiers.command || modifiers.shift);
-        self.activate(index, navigate);
+        self.activate(index, false);
     }
 
     pub(super) fn status_ui(&mut self, ui: &mut Ui) {
@@ -293,10 +308,13 @@ impl App {
                     let label = match transfer.kind {
                         TransferKind::Download => tr!("transfer_download"),
                         TransferKind::Upload => tr!("transfer_upload"),
+                        TransferKind::Delete => tr!("transfer_delete"),
                     };
                     ui.label(RichText::new(label).strong());
                     let (done, total) = (transfer.progress.done(), transfer.progress.total());
-                    let amount = if total > 0 {
+                    let amount = if total > 0 && transfer.kind == TransferKind::Delete {
+                        format!("{} / {total}", done.min(total))
+                    } else if total > 0 {
                         format!("{} / {}", format_size(Some(done.min(total))), format_size(Some(total)))
                     } else {
                         String::new()

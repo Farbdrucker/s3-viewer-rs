@@ -38,6 +38,33 @@ pub fn text_button(ui: &mut Ui, theme: &Theme, icon: &str, text: &str, tip: &str
     ui.add_enabled(enabled, button).on_hover_text(tip).on_disabled_hover_text(tip)
 }
 
+/// The connect button; green (style colours `connected_*`) while connected.
+/// Without `text` it is a square icon button.
+pub fn connect_button(
+    ui: &mut Ui,
+    theme: &Theme,
+    text: Option<&str>,
+    tip: &str,
+    enabled: bool,
+    connected: bool,
+) -> egui::Response {
+    let height = theme.shape.font_size + 20.0;
+    let label = match text {
+        Some(text) => format!("🔌  {text}"),
+        None => "🔌".to_owned(),
+    };
+    let mut label = RichText::new(label);
+    if text.is_none() {
+        label = label.size(theme.shape.font_size + 2.0);
+    }
+    let mut button = egui::Button::new(if connected { label.color(theme.colors.connected_text.0) } else { label })
+        .min_size(Vec2::new(if text.is_none() { height } else { 0.0 }, height));
+    if connected {
+        button = button.fill(theme.colors.connected_bg.0).stroke(Stroke::new(1.0, theme.colors.connected_line.0));
+    }
+    ui.add_enabled(enabled, button).on_hover_text(tip).on_disabled_hover_text(tip)
+}
+
 /// Accent-coloured button for the main action of a dialog.
 pub fn primary_button(ui: &mut Ui, theme: &Theme, text: &str) -> egui::Response {
     ui.add(

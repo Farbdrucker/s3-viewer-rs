@@ -39,7 +39,8 @@ impl App {
                             self.disconnect();
                         }
                         let tip = if self.connecting { tr!("connecting") } else { tr!("connect") };
-                        if widgets::icon_button(ui, &theme, "🔌", &tip, !self.connecting).clicked() {
+                        if widgets::connect_button(ui, &theme, None, &tip, !self.connecting, self.connected()).clicked()
+                        {
                             self.connect();
                         }
                     }
@@ -50,8 +51,15 @@ impl App {
                 return;
             }
             ui.horizontal(|ui| {
-                if widgets::text_button(ui, &theme, "💾", &tr!("save_profile"), &tr!("save_profile_tip"), true)
-                    .clicked()
+                if widgets::text_button(
+                    ui,
+                    &theme,
+                    "💾",
+                    &tr!("save_profile"),
+                    &tr!("save_profile_tip", path = crate::settings::display_path(&self.root)),
+                    true,
+                )
+                .clicked()
                 {
                     self.save_named_profile();
                 }
@@ -69,7 +77,9 @@ impl App {
                     self.delete_named_profile();
                 }
                 let label = if self.connecting { tr!("connecting") } else { tr!("connect") };
-                if widgets::text_button(ui, &theme, "🔌", &label, &label, !self.connecting).clicked() {
+                if widgets::connect_button(ui, &theme, Some(&label), &label, !self.connecting, self.connected())
+                    .clicked()
+                {
                     self.connect();
                 }
                 let connected = self.connected();
@@ -125,7 +135,7 @@ impl App {
                 }
             })
             .response
-            .on_hover_text(tr!("profile_tip"));
+            .on_hover_text(tr!("profile_tip", path = crate::settings::display_path(&self.root)));
         if let Some(name) = chosen {
             self.select_profile(name);
         }
@@ -158,7 +168,7 @@ impl App {
                 open_folder = ui.button(format!("📂 {}", tr!("theme_folder"))).clicked();
             })
             .response
-            .on_hover_text(tr!("theme_tip", path = self.themes.dir().display()));
+            .on_hover_text(tr!("theme_tip", path = crate::settings::display_path(self.themes.dir())));
         if let Some(id) = chosen {
             self.set_theme(&ctx, &id);
             self.save_settings();

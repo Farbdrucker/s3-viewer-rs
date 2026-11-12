@@ -151,6 +151,30 @@ fn round_trip_against_endpoint() {
         );
         assert!(remote.info.fetched < tiff.len() as u64, "only part of the file is read");
 
+        // New folder, then delete everything below the prefix (DeleteObjects with Content-MD5).
+        s3.create_folder(bucket, &format!("{base}made")).unwrap();
+        let (entries, _) = s3.list_folder(bucket, &base).unwrap();
+        assert!(entries.iter().any(|e| e.name == "made" && e.is_folder), "{signature:?}: new folder listed");
+        let (keys, capped) = s3.list_object_keys(bucket, &base).unwrap();
+        assert!(!capped);
+        assert!(keys.contains(&format!("{base}made/")), "placeholders are included");
+        let done = AtomicU64::new(0);
+        let deleted = s3
+            .delete_keys(
+                bucket,
+                &keys,
+                &|n| {
+                    done.fetch_add(n, Ordering::Relaxed);
+                },
+                &CancelFlag::new(),
+            )
+            .unwrap();
+        assert_eq!(deleted, keys.len());
+        assert_eq!(done.load(Ordering::Relaxed), keys.len() as u64);
+        assert!(s3.list_object_keys(bucket, &base).unwrap().0.is_empty(), "{signature:?}: everything deleted");
+        // Deleting again is harmless.
+        s3.delete_keys(bucket, &keys, &|_| {}, &CancelFlag::new()).unwrap();
+
         let _ = std::fs::remove_dir_all(dir);
     }
 }
