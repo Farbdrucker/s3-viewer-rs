@@ -1,0 +1,33 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  # The Builds workflow runs the tests before building.
+  workflow_call:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Start an S3 endpoint (SeaweedFS) for the integration tests
+        run: |
+          docker run -d --name s3 -p 8333:8333 -v "$PWD/tools/seaweedfs-s3.json:/etc/s3.json" \
+            chrislusf/seaweedfs server -s3 -s3.config=/etc/s3.json -s3.port=8333
+          for _ in $(seq 60); do curl -s -o /dev/null http://localhost:8333/ && break; sleep 1; done
+          sleep 5
+          echo "s3.bucket.create -name viewer-test" | docker exec -i s3 weed shell
+      - name: Unit and integration tests
+        env:
+          S3VIEWER_TEST_ENDPOINT: http://localhost:8333
+          S3VIEWER_TEST_ACCESS: testkey
+          S3VIEWER_TEST_SECRET: testsecret123
+          S3VIEWER_TEST_BUCKET: viewer-test
+        run: cargo test --all-targets --locked
