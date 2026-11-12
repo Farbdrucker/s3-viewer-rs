@@ -2,6 +2,7 @@
 //! text, tables, images and GeoTIFFs.
 
 pub mod app;
+pub mod filter;
 pub mod format;
 pub mod geotiff;
 pub mod i18n;

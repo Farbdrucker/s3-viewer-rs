@@ -1,6 +1,6 @@
 [package]
 name = "s3-viewer"
-version = "2.2.0"
+version = "2.3.0"
 edition = "2024"
 rust-version = "1.95"
 license = "MIT"
@@ -30,6 +30,7 @@ quick-xml = "0.42"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order", "arbitrary_precision"] }
 csv = "1.4"
+regex = "1"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"] }
 
 # GeoTIFF decoding
