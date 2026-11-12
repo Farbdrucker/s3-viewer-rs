@@ -109,24 +109,33 @@ impl App {
             });
         });
 
-        let visible = self.visible_rows();
         ui.horizontal(|ui| {
-            let response = widgets::filter_field(
-                ui,
-                &mut self.file_filter,
-                &tr!("filter_files"),
-                &tr!("filter_files_tip"),
-                ui.available_width() - 110.0,
-            );
+            let regex = self.settings.file_filter_regex;
+            let (hint, tip) = if regex {
+                (tr!("filter_files_regex"), tr!("filter_regex_tip"))
+            } else {
+                (tr!("filter_files"), tr!("filter_files_tip"))
+            };
+            let response = widgets::filter_field(ui, &mut self.file_filter, &hint, &tip, ui.available_width() - 230.0);
             if std::mem::take(&mut self.focus_file_filter) {
                 response.request_focus();
             }
-            let listed = self.rows.iter().filter(|row| row.entry.is_some()).count();
-            if !self.file_filter.trim().is_empty() && listed > 0 {
-                let matched = visible.iter().filter(|&&index| self.rows[index].entry.is_some()).count();
+            let toggle = ui.selectable_label(regex, RichText::new(".*").monospace().strong());
+            if toggle.on_hover_text(tr!("filter_regex_toggle")).clicked() {
+                self.settings.file_filter_regex = !regex;
+                self.save_settings();
+            }
+            self.refresh_name_filter();
+            if let Some(error) = self.name_filter.error() {
+                ui.label(RichText::new(tr!("filter_regex_invalid")).color(theme.colors.banner_text.0))
+                    .on_hover_text(error);
+            } else if self.name_filter.is_active() {
+                let listed = self.rows.iter().filter(|row| row.entry.is_some()).count();
+                let matched = self.visible_rows().iter().filter(|&&index| self.rows[index].entry.is_some()).count();
                 ui.label(widgets::muted(&theme, format!("{matched} / {listed}")));
             }
         });
+        let visible = self.visible_rows();
         ui.add_space(4.0);
 
         if self.bucket.is_empty() {

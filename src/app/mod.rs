@@ -14,6 +14,7 @@ use std::time::{Duration, Instant};
 
 use eframe::egui::{self, Margin, ViewportCommand};
 
+use crate::filter::NameFilter;
 use crate::format::format_size;
 use crate::geotiff::{self, FnSource, Style, TiffError, TiffPreview};
 use crate::i18n::{self, Language};
@@ -215,6 +216,9 @@ pub struct App {
     prefix: String,
     rows: Vec<Row>,
     file_filter: String,
+    /// Compiled from `file_filter` and the regex switch; rebuilt only when either changes.
+    name_filter: NameFilter,
+    name_filter_key: (String, bool),
     selected: HashSet<String>,
     current: Option<String>,
     anchor: Option<String>,
@@ -277,6 +281,8 @@ impl App {
             prefix: String::new(),
             rows: Vec::new(),
             file_filter: String::new(),
+            name_filter: NameFilter::All,
+            name_filter_key: (String::new(), false),
             selected: HashSet::new(),
             current: None,
             anchor: None,
@@ -732,14 +738,21 @@ impl App {
     }
 
     /// Indices of rows that pass the file filter. The ".." row always stays.
+    fn refresh_name_filter(&mut self) {
+        let key = (self.file_filter.clone(), self.settings.file_filter_regex);
+        if key != self.name_filter_key {
+            self.name_filter = NameFilter::new(&key.0, key.1);
+            self.name_filter_key = key;
+        }
+    }
+
     fn visible_rows(&self) -> Vec<usize> {
-        let query = self.file_filter.trim().to_lowercase();
         self.rows
             .iter()
             .enumerate()
             .filter(|(_, row)| match &row.entry {
                 None => true,
-                Some(entry) => query.is_empty() || entry.name.to_lowercase().contains(&query),
+                Some(entry) => self.name_filter.matches(&entry.name),
             })
             .map(|(index, _)| index)
             .collect()
@@ -1545,6 +1558,7 @@ impl eframe::App for App {
             let id = self.settings.theme.clone();
             self.set_theme(&ctx, &id);
         }
+        self.refresh_name_filter();
         self.handle_shortcuts(&ctx);
         if self.shown_title != self.window_title {
             self.shown_title = self.window_title.clone();

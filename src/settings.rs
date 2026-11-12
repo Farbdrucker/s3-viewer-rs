@@ -88,6 +88,8 @@ pub struct Settings {
     pub geotiff_edge: u32,
     /// Most tile data fetched for one GeoTIFF preview, in MiB.
     pub geotiff_budget_mb: u64,
+    /// Treat the file name filter as a regular expression.
+    pub file_filter_regex: bool,
     /// Look for a newer release on GitHub at start (at most once a day).
     pub update_check: bool,
     /// Unix time of the last successful check.
@@ -113,6 +115,7 @@ impl Default for Settings {
             preview_detached: false,
             geotiff_edge: 1024,
             geotiff_budget_mb: 64,
+            file_filter_regex: false,
             update_check: true,
             last_update_check: None,
             latest_version: None,

@@ -37,7 +37,9 @@ first time with right-click → Open).
   path-style addressing, TLS verification (switchable for self-signed certificates; the
   operating system's certificate store is used). Named connections can be saved, loaded
   and removed. The card folds up to a one-line summary.
-- **Browsing**: bucket list with filter, folder table with path links, `..` row, filter,
+- **Browsing**: bucket list with filter, folder table with path links, `..` row, name
+  filter as plain text or, with the `.*` switch, as a case-insensitive regular expression
+  (e.g. `\.tiff?$`, `^tile_\d+_\d+\.png$`, `2024|2025`),
   sorting by name/size/date (folders first), multi-selection with Ctrl/Shift, keyboard use
   (arrows, Enter, Backspace, F5, Ctrl+F, Ctrl+A). A click selects and previews, a
   double-click opens a folder. New folders can be created. Listings are capped at 5000 entries;

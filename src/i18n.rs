@@ -244,10 +244,22 @@ static STRINGS: &[(&str, &str, &str)] = &[
         "Shows only buckets whose name contains this text.",
     ),
     ("filter_files", "Dateiname filtern", "Filter file name"),
+    ("filter_files_regex", "Regulärer Ausdruck, z. B. \\.tiff?$", "Regular expression, e.g. \\.tiff?$"),
     (
         "filter_files_tip",
         "Zeigt nur Dateien und Ordner, deren Name diesen Text enthält.",
         "Shows only files and folders whose name contains this text.",
+    ),
+    ("filter_regex_invalid", "Ungültiger Ausdruck", "Invalid expression"),
+    (
+        "filter_regex_tip",
+        "Zeigt nur Dateien und Ordner, deren Name zum regulären Ausdruck passt. ^ und $ binden an Anfang und Ende, z. B. ^tile_\\d+\\.png$ oder 2024|2025.",
+        "Shows only files and folders whose name matches the regular expression. ^ and $ anchor to start and end, e.g. ^tile_\\d+\\.png$ or 2024|2025.",
+    ),
+    (
+        "filter_regex_toggle",
+        "Filter als regulären Ausdruck verwenden (Groß-/Kleinschreibung egal)",
+        "Use the filter as a regular expression (case-insensitive)",
     ),
     ("fold_collapse", "Verbindung nach oben einklappen", "Collapse the connection panel"),
     ("fold_expand", "Verbindung ausklappen", "Expand the connection panel"),
