@@ -57,6 +57,7 @@ first time with right-click → Open).
 - **Styles**: light, dark and example styles built in; your own styles as TOML files,
   reloaded while you edit them.
 - German and English interface (button in the connection card).
+- Optional notice when a newer release is available on GitHub (see [Update check](#update-check)).
 
 ## GeoTIFF preview
 
@@ -149,6 +150,22 @@ proportional = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 [`themes/light.toml`](themes/light.toml) lists and explains every key. A file in the
 `themes` folder with the name of a built-in style (for example `dark.toml`)
 replaces it and may `extends = "dark"` to inherit from the original.
+
+## Update check
+
+At start, the viewer asks GitHub's public release API at most once a day whether a newer
+version exists. If so, a "Version x.y.z available" button appears in the connection card
+and opens the download page; nothing is downloaded or installed automatically. The check
+runs in the background with short timeouts, honours `HTTPS_PROXY`, and fails silently, so
+the program works the same without access to GitHub. The ⚙ menu shows the installed
+version and the last result, and has **Check now**.
+
+To turn it off:
+
+- untick **Check for a new version at start** in the ⚙ menu, or set
+  `"update_check": false` in `settings.json`;
+- for all users of a machine, set the environment variable `S3VIEWER_UPDATE_CHECK=0`.
+  The app then never contacts GitHub and the setting cannot be switched on.
 
 ## Connection notes
 

@@ -26,7 +26,16 @@ impl App {
                     if collapsed {
                         ui.label(widgets::muted(&theme, self.connection_summary()));
                     }
+                    self.settings_menu(ui);
                     self.theme_menu(ui);
+                    if let Some(release) = self.update.available.clone() {
+                        let label = RichText::new(format!("⬆ {}", tr!("update_available", version = release.version)))
+                            .color(theme.colors.accent_text.0);
+                        let tip = tr!("update_available_tip", current = crate::update::CURRENT);
+                        if ui.add(egui::Button::new(label).fill(theme.colors.accent.0)).on_hover_text(tip).clicked() {
+                            ui.ctx().open_url(egui::OpenUrl::new_tab(release.url));
+                        }
+                    }
                     let language = if i18n::language() == Language::En { "EN" } else { "DE" };
                     if ui.button(RichText::new(language).strong()).on_hover_text(tr!("language")).clicked() {
                         self.toggle_language();
@@ -139,6 +148,44 @@ impl App {
         if let Some(name) = chosen {
             self.select_profile(name);
         }
+    }
+
+    fn settings_menu(&mut self, ui: &mut Ui) {
+        let theme = self.theme.clone();
+        ui.menu_button("⚙", |ui| {
+            ui.set_min_width(300.0);
+            ui.label(widgets::muted(&theme, tr!("update_current", version = crate::update::CURRENT)));
+            ui.separator();
+            let blocked = crate::update::disabled_by_environment();
+            let mut enabled = self.settings.update_check && !blocked;
+            let response = ui.add_enabled(!blocked, egui::Checkbox::new(&mut enabled, tr!("update_check_setting")));
+            let response = response.on_hover_text(tr!("update_check_tip"));
+            if blocked {
+                response.on_disabled_hover_text(tr!("update_disabled_env"));
+                ui.label(widgets::muted(&theme, tr!("update_disabled_env")));
+                return;
+            }
+            if response.changed() {
+                self.settings.update_check = enabled;
+                self.save_settings();
+                if enabled {
+                    self.start_update_check(false);
+                } else {
+                    self.update.available = None;
+                }
+            }
+            ui.horizontal(|ui| {
+                let label = if self.update.checking { tr!("update_checking") } else { tr!("update_check_now") };
+                if ui.add_enabled(!self.update.checking, egui::Button::new(label)).clicked() {
+                    self.start_update_check(true);
+                }
+                if let Some(message) = &self.update.message {
+                    ui.add(egui::Label::new(widgets::muted(&theme, message)).wrap());
+                }
+            });
+        })
+        .response
+        .on_hover_text(tr!("settings_menu"));
     }
 
     fn theme_menu(&mut self, ui: &mut Ui) {

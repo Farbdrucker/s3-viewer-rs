@@ -11,4 +11,5 @@ pub mod s3;
 pub mod settings;
 pub mod theme;
 pub mod transfer;
+pub mod update;
 pub mod xml;

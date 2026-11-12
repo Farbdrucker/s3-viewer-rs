@@ -88,6 +88,12 @@ pub struct Settings {
     pub geotiff_edge: u32,
     /// Most tile data fetched for one GeoTIFF preview, in MiB.
     pub geotiff_budget_mb: u64,
+    /// Look for a newer release on GitHub at start (at most once a day).
+    pub update_check: bool,
+    /// Unix time of the last successful check.
+    pub last_update_check: Option<i64>,
+    /// Newest version GitHub reported at that check.
+    pub latest_version: Option<String>,
 }
 
 impl Default for Settings {
@@ -107,6 +113,9 @@ impl Default for Settings {
             preview_detached: false,
             geotiff_edge: 1024,
             geotiff_budget_mb: 64,
+            update_check: true,
+            last_update_check: None,
+            latest_version: None,
         }
     }
 }

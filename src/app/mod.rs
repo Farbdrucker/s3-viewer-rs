@@ -27,6 +27,7 @@ use crate::settings::Settings;
 use crate::theme::{self, Fonts, Theme, ThemeStore};
 use crate::tr;
 use crate::transfer::{self, UploadPlan};
+use crate::update;
 pub(crate) use dialogs::{Confirmed, Dialog};
 use preview_panel::ImageView;
 use tasks::{Channel, Progress, Tasks};
@@ -184,6 +185,15 @@ enum PreviewResult {
     Failed(String),
 }
 
+/// State of the optional GitHub release check.
+#[derive(Default)]
+pub struct UpdateState {
+    pub checking: bool,
+    pub available: Option<update::Release>,
+    /// Result of the last check, shown in the settings menu.
+    pub message: Option<String>,
+}
+
 pub struct App {
     root: PathBuf,
     settings: Settings,
@@ -226,6 +236,7 @@ pub struct App {
     tasks: Tasks,
     generations: HashMap<Channel, u64>,
     window_title: String,
+    update: UpdateState,
     shown_title: String,
 }
 
@@ -285,11 +296,13 @@ impl App {
             generations: HashMap::new(),
             window_title: "S3 Viewer".into(),
             shown_title: "S3 Viewer".into(),
+            update: UpdateState::default(),
             settings,
         };
         let theme_id = app.settings.theme.clone();
         app.set_theme(&cc.egui_ctx, &theme_id);
         app.reload_profiles(None);
+        app.start_update_check(false);
         app
     }
 
@@ -358,6 +371,50 @@ impl App {
 
     fn connected(&self) -> bool {
         self.session.is_some()
+    }
+
+    // ---------------------------------------------------------------- updates
+
+    /// Looks for a newer release in the background. Without `manual` it only
+    /// runs when enabled and the last check is more than a day old; otherwise
+    /// the remembered answer is used. Failures never interrupt the user.
+    fn start_update_check(&mut self, manual: bool) {
+        if update::disabled_by_environment() || self.update.checking {
+            return;
+        }
+        if !manual {
+            if !self.settings.update_check {
+                return;
+            }
+            if !update::due(self.settings.last_update_check, chrono::Utc::now().timestamp()) {
+                self.update.available = self
+                    .settings
+                    .latest_version
+                    .clone()
+                    .filter(|version| update::is_newer(version, update::CURRENT))
+                    .map(|version| update::Release { version, url: update::RELEASES_PAGE.to_owned() });
+                return;
+            }
+        }
+        self.update.checking = true;
+        self.tasks.spawn(update::fetch_latest, |app, result| {
+            app.update.checking = false;
+            match result {
+                Ok(release) => {
+                    app.settings.last_update_check = Some(chrono::Utc::now().timestamp());
+                    app.settings.latest_version = Some(release.version.clone());
+                    let _ = app.settings.save(&app.root);
+                    if update::is_newer(&release.version, update::CURRENT) {
+                        app.update.message = None;
+                        app.update.available = Some(release);
+                    } else {
+                        app.update.message = Some(tr!("update_latest"));
+                        app.update.available = None;
+                    }
+                }
+                Err(error) => app.update.message = Some(tr!("update_failed", error = error)),
+            }
+        });
     }
 
     // ---------------------------------------------------------------- styles
