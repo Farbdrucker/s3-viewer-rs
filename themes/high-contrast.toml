@@ -1,0 +1,24 @@
+# Example style built on "light": strong contrast and larger text.
+
+name = "High contrast"
+extends = "light"
+
+[colors]
+background = "#ffffff"
+text = "#000000"
+muted = "#333333"
+line = "#000000"
+section = "#000000"
+accent = "#0040c0"
+selection = "#0040c0"
+selection_text = "#ffffff"
+crumb = "#0040c0"
+header_text = "#000000"
+code_bg = "#000000"
+code_text = "#ffffff"
+
+[shape]
+font_size = 16.0
+heading_size = 18.0
+mono_size = 15.0
+row_height = 32.0

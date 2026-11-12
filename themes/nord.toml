@@ -1,0 +1,37 @@
+# Example style built on "dark": the Nord palette with rounder corners.
+
+name = "Nord"
+extends = "dark"
+
+[colors]
+background = "#2e3440"
+card = "#3b4252"
+input = "#2e3440"
+hover = "#434c5e"
+line = "#4c566a"
+text = "#eceff4"
+muted = "#a3acbd"
+section = "#88c0d0"
+accent = "#5e81ac"
+selection = "#434c5e"
+selection_text = "#eceff4"
+header = "#3b4252"
+stripe = "#353c4a"
+crumb = "#88c0d0"
+badge_bg = "#5e81ac"
+badge_text = "#eceff4"
+code_bg = "#2e3440"
+gutter_bg = "#272c36"
+image_bg = "#272c36"
+
+[syntax]
+key = "#88c0d0"
+string = "#a3be8c"
+number = "#b48ead"
+keyword = "#81a1c1"
+tag = "#81a1c1"
+attribute = "#8fbcbb"
+
+[shape]
+radius = 10.0
+card_radius = 14.0

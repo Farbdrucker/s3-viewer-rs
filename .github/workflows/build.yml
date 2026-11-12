@@ -1,0 +1,113 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Start an S3 endpoint (SeaweedFS) for the integration tests
+        run: |
+          docker run -d --name s3 -p 8333:8333 -v "$PWD/tools/seaweedfs-s3.json:/etc/s3.json" \
+            chrislusf/seaweedfs server -s3 -s3.config=/etc/s3.json -s3.port=8333
+          for i in $(seq 60); do curl -s -o /dev/null http://localhost:8333/ && break; sleep 1; done
+          sleep 5
+          echo "s3.bucket.create -name viewer-test" | docker exec -i s3 weed shell
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - name: Tests
+        env:
+          S3VIEWER_TEST_ENDPOINT: http://localhost:8333
+          S3VIEWER_TEST_ACCESS: testkey
+          S3VIEWER_TEST_SECRET: testsecret123
+          S3VIEWER_TEST_BUCKET: viewer-test
+        run: cargo test --all-targets
+
+  build:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, target: x86_64-unknown-linux-gnu, name: linux-x86_64 }
+          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu, name: linux-arm64 }
+          - { os: windows-2022, target: x86_64-pc-windows-msvc, name: windows-x86_64 }
+          - { os: windows-11-arm, target: aarch64-pc-windows-msvc, name: windows-arm64 }
+          - { os: macos-14, target: aarch64-apple-darwin, name: macos-arm64 }
+          - { os: macos-14, target: x86_64-apple-darwin, name: macos-x86_64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          dir=s3-viewer-${{ matrix.name }}
+          mkdir -p "$dir/themes"
+          cp target/${{ matrix.target }}/release/s3-viewer README.md LICENSE packaging/linux/s3-viewer.desktop "$dir/"
+          cp themes/*.toml "$dir/themes/"
+          tar czf "$dir.tar.gz" "$dir"
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          app="S3 Viewer.app"
+          mkdir -p "$app/Contents/MacOS" themes-out
+          cp target/${{ matrix.target }}/release/s3-viewer "$app/Contents/MacOS/"
+          cp packaging/macos/Info.plist "$app/Contents/"
+          codesign --force --deep --sign - "$app"
+          dir=s3-viewer-${{ matrix.name }}
+          mkdir -p "$dir/themes"
+          mv "$app" "$dir/"
+          cp README.md LICENSE "$dir/"
+          cp themes/*.toml "$dir/themes/"
+          ditto -c -k --keepParent "$dir" "$dir.zip"
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dir = "s3-viewer-${{ matrix.name }}"
+          New-Item -ItemType Directory -Force "$dir/themes" | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/s3-viewer.exe", README.md, LICENSE "$dir/"
+          Copy-Item themes/*.toml "$dir/themes/"
+          Compress-Archive -Path $dir -DestinationPath "$dir.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: s3-viewer-${{ matrix.name }}
+          path: |
+            s3-viewer-${{ matrix.name }}.tar.gz
+            s3-viewer-${{ matrix.name }}.zip
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*

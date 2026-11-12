@@ -1,0 +1,52 @@
+[package]
+name = "s3-viewer"
+version = "2.0.0"
+edition = "2024"
+rust-version = "1.95"
+license = "MIT"
+description = "Desktop viewer for OpenStack and other S3-compatible object stores, with GeoTIFF previews"
+default-run = "s3-viewer"
+
+[dependencies]
+# GUI: wgpu is the default renderer, glow (OpenGL) is the fallback.
+eframe = { version = "0.37", features = ["persistence", "glow"] }
+egui = { version = "0.37", features = ["monochrome_emoji_fonts"] }
+egui_extras = "0.37"
+rfd = "0.18"
+
+# S3 over HTTP. No gzip: objects must arrive byte-for-byte as stored.
+ureq = { version = "3.5", default-features = false, features = ["rustls", "platform-verifier"] }
+sha2 = "0.10"
+sha1 = "0.10"
+hmac = "0.12"
+base64 = "0.22"
+percent-encoding = "2.3"
+httpdate = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+quick-xml = "0.42"
+
+# Previews
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order", "arbitrary_precision"] }
+csv = "1.4"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"] }
+
+# GeoTIFF decoding
+flate2 = "1"
+weezl = "0.2"
+ruzstd = "0.9"
+jpeg-decoder = { version = "0.3", default-features = false }
+
+# Config and themes
+toml = "0.9"
+directories = "6"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 4
+strip = true
+
+# Image decoding is painfully slow without optimisation, even in debug builds.
+[profile.dev.package."*"]
+opt-level = 2

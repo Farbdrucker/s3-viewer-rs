@@ -1,0 +1,31 @@
+# S3 Viewer style: Dark (built in). See light.toml for every key.
+
+name = "Dark"
+extends = "light"
+dark = true
+
+[colors]
+background = "#1b2430"
+card = "#243041"
+text = "#e5e7eb"
+muted = "#94a3b8"
+line = "#3d4d63"
+input = "#1b2430"
+hover = "#2c3b50"
+section = "#99f6e4"
+accent = "#0f766e"
+accent_text = "#ecfeff"
+selection = "#134e4a"
+selection_text = "#ccfbf1"
+header = "#1e293b"
+header_text = "#94a3b8"
+stripe = "#202b3a"
+crumb = "#5eead4"
+crumb_current = "#e5e7eb"
+disabled = "#64748b"
+banner_bg = "#3f1d24"
+banner_text = "#fecdd3"
+banner_line = "#9f1239"
+notice = "#fdba74"
+badge_bg = "#134e4a"
+badge_text = "#ccfbf1"

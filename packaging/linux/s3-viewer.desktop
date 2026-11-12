@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=S3 Viewer
+GenericName=S3 Viewer
+Comment=OpenStack- und S3-Buckets durchsehen
+Comment[en]=Browse OpenStack and S3 buckets
+Exec=s3-viewer
+Icon=folder-remote
+Terminal=false
+Categories=Utility;Network;
+StartupNotify=true
+StartupWMClass=s3-viewer

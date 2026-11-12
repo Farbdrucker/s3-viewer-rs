@@ -1,0 +1,73 @@
+# S3 Viewer style: Light (built in)
+#
+# Every style is one TOML file. Put your own into ~/.s3-viewer/themes/
+# (or use "Save the current style as a template" in the style menu).
+# The viewer reloads a style as soon as its file changes.
+#
+# A style may start from another one and only change a few values:
+#
+#   name = "My style"
+#   extends = "dark"          # light, dark, nord, high-contrast or a file name
+#   [colors]
+#   accent = "#e11d48"
+#
+# Colours are "#rrggbb" or "#rrggbbaa".
+
+name = "Light"
+# Whether egui's dark defaults (scroll bars, shadows, …) fit this style.
+dark = false
+
+[colors]
+background = "#eef2f5"      # window background
+card = "#ffffff"            # panels, lists, buttons
+text = "#1f2933"
+muted = "#627083"           # hints, counters, secondary text
+line = "#d5dee8"            # borders and separators
+input = "#ffffff"           # text fields
+hover = "#f8fafc"           # button hover
+section = "#12312e"         # section headings
+accent = "#0f766e"          # focus, progress, active toggles
+accent_text = "#ffffff"     # text on the accent colour
+selection = "#ccfbf1"       # selected rows
+selection_text = "#134e4a"
+header = "#f8fafc"          # table headers
+header_text = "#526174"
+stripe = "#f8fafc"          # every other table row
+crumb = "#0f766e"           # path links
+crumb_current = "#1f2933"   # last path element
+disabled = "#94a3b8"
+banner_bg = "#fde8e8"       # error banner
+banner_text = "#9f1239"
+banner_line = "#fecdd3"
+notice = "#9a3412"          # notes above the preview
+badge_bg = "#ccfbf1"        # file type badge
+badge_text = "#115e59"
+code_bg = "#111827"         # text preview
+code_text = "#e5e7eb"
+gutter_bg = "#0b1220"       # line numbers
+gutter_text = "#94a3b8"
+image_bg = "#1f2937"        # behind images and GeoTIFFs
+
+[syntax]
+key = "#7dd3fc"
+string = "#86efac"
+number = "#fdba74"
+keyword = "#c4b5fd"
+comment = "#94a3b8"
+tag = "#67e8f9"
+attribute = "#fcd34d"
+punct = "#cbd5e1"
+
+[shape]
+radius = 7.0                # buttons and fields
+card_radius = 12.0          # the connection card and panels
+spacing = 8.0               # gap between widgets
+font_size = 14.0
+heading_size = 16.0
+mono_size = 13.0
+row_height = 28.0           # file list rows
+
+[fonts]
+# Optional paths to .ttf/.otf files. Empty means the built-in fonts.
+proportional = ""
+monospace = ""
