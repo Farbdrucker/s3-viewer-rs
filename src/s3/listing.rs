@@ -146,6 +146,16 @@ pub fn file_records(prefix: &str, page: &ListPage) -> Vec<(String, u64)> {
         .collect()
 }
 
+/// Keys below a prefix including folder placeholders, but not the prefix itself.
+pub fn object_keys(prefix: &str, page: &ListPage) -> Vec<String> {
+    page.objects
+        .iter()
+        .map(|(key, _, _)| key)
+        .filter(|key| !key.is_empty() && *key != prefix && (prefix.is_empty() || key.starts_with(prefix)))
+        .cloned()
+        .collect()
+}
+
 pub fn sort_entries(entries: &mut [ObjectEntry]) {
     entries.sort_by_cached_key(|entry| (!entry.is_folder, entry.name.to_lowercase()));
 }
@@ -189,6 +199,12 @@ mod tests {
     fn file_records_skip_placeholders() {
         let listing = page(&[], &[("p/", 0), ("p/a", 1), ("p/d/", 0), ("p/d/b", 2)]);
         assert_eq!(file_records("p/", &listing), vec![("p/a".to_string(), 1), ("p/d/b".to_string(), 2)]);
+    }
+
+    #[test]
+    fn object_keys_keep_placeholders() {
+        let listing = page(&[], &[("p/", 0), ("p/a", 1), ("p/d/", 0), ("p/d/b", 2), ("q/x", 3)]);
+        assert_eq!(object_keys("p/", &listing), vec!["p/a", "p/d/", "p/d/b"]);
     }
 
     #[test]

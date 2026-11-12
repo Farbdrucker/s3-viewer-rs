@@ -100,8 +100,31 @@ static STRINGS: &[(&str, &str, &str)] = &[
     ("copy", "Text kopieren", "Copy text"),
     ("counts", "{folders} Ordner, {files} Dateien", "{folders} folders, {files} files"),
     ("created", "Erstellt {when}", "Created {when}"),
+    ("delete", "Löschen", "Delete"),
+    (
+        "delete_body",
+        "Diese Einträge werden unwiderruflich gelöscht:\n{names}",
+        "These items will be permanently deleted:\n{names}",
+    ),
+    (
+        "delete_cancelled",
+        "Löschen abgebrochen. Bereits gelöschte Objekte bleiben gelöscht.",
+        "Deletion cancelled. Objects already deleted stay deleted.",
+    ),
+    (
+        "delete_folders",
+        "\nOrdner werden zusammen mit allem Inhalt gelöscht.",
+        "\nFolders are deleted together with everything inside.",
+    ),
     ("delete_profile", "Entfernen", "Remove"),
     ("delete_profile_tip", "Die ausgewählte gespeicherte Verbindung löschen", "Delete the selected saved connection"),
+    (
+        "delete_tip",
+        "Löscht die markierten Dateien und Ordner. Ein Ordner wird mit seinem Inhalt gelöscht. Mehrere mit Strg+Klick oder Umschalt+Klick auswählen.",
+        "Deletes the selected files and folders. A folder is deleted with its contents. Ctrl+click or Shift+click selects more than one.",
+    ),
+    ("deleted_many", "{count} Objekte gelöscht", "{count} objects deleted"),
+    ("deleted_one", "1 Objekt gelöscht", "1 object deleted"),
     (
         "direct_bucket_notice",
         "Die Bucket-Liste ist mit diesen Rechten nicht abrufbar. Der eingetragene Bucket wurde direkt geöffnet.",
@@ -211,8 +234,8 @@ static STRINGS: &[(&str, &str, &str)] = &[
     ("files", "Dateien", "Files"),
     (
         "files_placeholder",
-        "Nach der Verbindung links einen Bucket wählen.\nOrdner öffnen sich per Klick. Textdateien, CSV, JSON, YAML, XML,\nBilder und GeoTIFFs erscheinen in der Dateivorschau.",
-        "After connecting, choose a bucket on the left.\nFolders open with a click. Text files, CSV, JSON, YAML, XML,\nimages and GeoTIFFs appear in the preview.",
+        "Nach der Verbindung links einen Bucket wählen.\nOrdner öffnen sich per Doppelklick. Textdateien, CSV, JSON, YAML, XML,\nBilder und GeoTIFFs erscheinen in der Dateivorschau.",
+        "After connecting, choose a bucket on the left.\nFolders open with a double-click. Text files, CSV, JSON, YAML, XML,\nimages and GeoTIFFs appear in the preview.",
     ),
     ("filter_buckets", "Bucket-Name filtern", "Filter bucket name"),
     (
@@ -295,6 +318,20 @@ static STRINGS: &[(&str, &str, &str)] = &[
     ("list_capped", ". Anzeige auf {limit} Einträge begrenzt.", ". Showing at most {limit} entries."),
     ("loading_folder", "Lade Ordner…", "Loading folder…"),
     ("loading_preview", "Lade Vorschau…", "Loading preview…"),
+    ("new_folder", "Neuer Ordner", "New folder"),
+    ("new_folder_created", "Ordner „{name}“ angelegt", "Created folder “{name}”"),
+    ("new_folder_exists", "Der Ordner „{name}“ ist schon da.", "The folder “{name}” already exists."),
+    (
+        "new_folder_invalid",
+        "Der Ordnername darf nicht leer sein und keine Schrägstriche enthalten.",
+        "The folder name must not be empty or contain slashes.",
+    ),
+    ("new_folder_label", "Name", "Name"),
+    (
+        "new_folder_tip",
+        "Legt im geöffneten Bucket und Ordner einen neuen Ordner an.",
+        "Creates a new folder in the open bucket and folder.",
+    ),
     ("no", "Nein", "No"),
     (
         "no_bucket_list",
@@ -316,7 +353,7 @@ static STRINGS: &[(&str, &str, &str)] = &[
     ("noun_file", "Datei", "file"),
     ("noun_files", "Dateien", "files"),
     ("ok", "OK", "OK"),
-    ("open_folder", "Klick öffnet den Ordner.", "Click opens the folder."),
+    ("open_folder", "Doppelklick öffnet den Ordner.", "Double-click opens the folder."),
     ("parent_folder", "Übergeordneter Ordner", "Parent folder"),
     ("path_style", "Pfad-Stil", "Path style"),
     (
@@ -346,7 +383,7 @@ static STRINGS: &[(&str, &str, &str)] = &[
     ("profile_incomplete", "Die Verbindung „{name}“ ist unvollständig.", "The connection “{name}” is incomplete."),
     ("profile_missing", "Die Verbindung „{name}“ ist nicht gespeichert.", "The connection “{name}” is not saved."),
     ("profile_needs_name", "Die Verbindung braucht einen Namen.", "The connection needs a name."),
-    ("profile_tip", "Gespeicherte Verbindung aus ~/.s3-viewer laden", "Load a saved connection from ~/.s3-viewer"),
+    ("profile_tip", "Gespeicherte Verbindung aus {path} laden", "Load a saved connection from {path}"),
     (
         "profile_unreadable",
         "Die gespeicherten Verbindungen konnten nicht gelesen werden.",
@@ -359,7 +396,7 @@ static STRINGS: &[(&str, &str, &str)] = &[
         "Region aus der Liste wählen oder eintragen. Der Name geht in die Signatur ein. Bei OpenStack oft RegionOne, sonst häufig us-east-1.",
         "Choose a region from the list or type one. The name is part of the signature. On OpenStack often RegionOne, otherwise usually us-east-1.",
     ),
-    ("remove_connection_body", "„{name}“ aus ~/.s3-viewer entfernen?", "Remove “{name}” from ~/.s3-viewer?"),
+    ("remove_connection_body", "„{name}“ aus {path} entfernen?", "Remove “{name}” from {path}?"),
     ("remove_connection_title", "Verbindung entfernen", "Remove connection"),
     ("removed_connection", "„{name}“ entfernt", "Removed “{name}”"),
     (
@@ -387,8 +424,8 @@ static STRINGS: &[(&str, &str, &str)] = &[
     ("save_profile", "Speichern", "Save"),
     (
         "save_profile_tip",
-        "Endpunkt und Zugangsdaten unter einem Namen in ~/.s3-viewer speichern",
-        "Save endpoint and credentials under a name in ~/.s3-viewer",
+        "Endpunkt und Zugangsdaten unter einem Namen in {path} speichern",
+        "Save endpoint and credentials under a name in {path}",
     ),
     ("saved_at", "Gespeichert: {path}", "Saved: {path}"),
     ("saved_capped", ". Es wurden höchstens {limit} Dateien berücksichtigt.", ". At most {limit} files were included."),
@@ -466,6 +503,7 @@ static STRINGS: &[(&str, &str, &str)] = &[
         "Die Datei hat keine Übersichten. Die Vorschau ist aus {used} von {total} Blöcken zusammengesetzt und daher grob. Mit Übersichten (gdaladdo, COG) wird sie genau und schnell.",
         "The file has no overviews. The preview is assembled from {used} of {total} blocks and is therefore coarse. With overviews (gdaladdo, COG) it becomes exact and fast.",
     ),
+    ("transfer_delete", "Löschen", "Delete"),
     ("transfer_download", "Download", "Download"),
     ("transfer_upload", "Upload", "Upload"),
     ("up", "Nach oben (Rücktaste)", "Up (Backspace)"),

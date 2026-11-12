@@ -12,9 +12,9 @@
 Desktop program for browsing buckets of OpenStack and other S3-compatible object stores,
 written in pure Rust. Runs on Linux, Windows and macOS, on x86_64 and ARM64.
 
-It replaces the earlier Python/Qt version and keeps all of its features. Saved connections
-(`~/.s3-viewer/connections.json`) are read as they are, and the remembered form values
-of the old version are taken over on first start.
+It replaces the earlier Python/Qt version and keeps all of its features. Both versions
+share the same configuration folder (see [Files](#files)), so saved connections work in
+either one.
 
 ## Download
 
@@ -39,7 +39,8 @@ first time with right-click → Open).
   and removed. The card folds up to a one-line summary.
 - **Browsing**: bucket list with filter, folder table with path links, `..` row, filter,
   sorting by name/size/date (folders first), multi-selection with Ctrl/Shift, keyboard use
-  (arrows, Enter, Backspace, F5, Ctrl+F, Ctrl+A). Listings are capped at 5000 entries;
+  (arrows, Enter, Backspace, F5, Ctrl+F, Ctrl+A). A click selects and previews, a
+  double-click opens a folder. New folders can be created. Listings are capped at 5000 entries;
   endpoints without ListObjectsV2 fall back to ListObjects.
 - **Preview** (docked left or right, or in its own window):
   - text with line numbers; JSON and XML pretty-printed; JSON/NDJSON/GeoJSON, YAML,
@@ -50,8 +51,9 @@ first time with right-click → Open).
   - edit text files and write them back to the bucket, copy text, save the file
 - **Transfers**: download selected files or whole folders (structure kept, existing local
   files are not overwritten), upload files or folders into the open folder with a question
-  before replacing existing objects. Progress bar with byte counts; downloads and uploads
-  can be cancelled. Large uploads use multipart upload.
+  before replacing existing objects. Delete selected files and folders (folders with all
+  their contents, after a question). Progress bar with byte or object counts; transfers
+  and deletions can be cancelled. Large uploads use multipart upload.
 - **Styles**: light, dark and example styles built in; your own styles as TOML files,
   reloaded while you edit them.
 - German and English interface (button in the connection card).
@@ -93,7 +95,19 @@ pixels, default 1024) and `geotiff_budget_mb` (bytes of tile data per preview, d
 
 ## Files
 
-Everything lives in `~/.s3-viewer` (override with the environment variable `S3VIEWER_HOME`):
+Everything lives in the usual configuration folder of the system, the same one the Python
+version uses:
+
+| System | Folder |
+| --- | --- |
+| Linux | `~/.config/s3-viewer` (or `$XDG_CONFIG_HOME/s3-viewer`) |
+| macOS | `~/Library/Application Support/s3-viewer` |
+| Windows | `%AppData%\s3-viewer` |
+
+`S3VIEWER_HOME` overrides the folder. On first start, files from the old `~/.s3-viewer`
+folder (connections, settings, styles) are copied over; the old folder is left as it is.
+Settings of the Python version (`settings.ini`) are taken over when no `settings.json`
+exists yet.
 
 | File | Content |
 | --- | --- |
@@ -109,7 +123,7 @@ Open the style menu (🎨 in the connection card):
 
 - pick a style,
 - **Save the current style as a template** writes the complete style to
-  `~/.s3-viewer/themes/my-<name>.toml` and selects it,
+  `themes/my-<name>.toml` in the configuration folder and selects it,
 - **Open the styles folder**.
 
 Edit and save the file; the window updates within a second. Mistakes (unknown keys,
@@ -132,8 +146,8 @@ font_size = 15.0
 proportional = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 ```
 
-[`themes/light.toml`](themes/light.toml) lists and explains every key. A file in
-`~/.s3-viewer/themes` with the name of a built-in style (for example `dark.toml`)
+[`themes/light.toml`](themes/light.toml) lists and explains every key. A file in the
+`themes` folder with the name of a built-in style (for example `dark.toml`)
 replaces it and may `extends = "dark"` to inherit from the original.
 
 ## Connection notes

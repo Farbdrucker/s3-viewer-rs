@@ -1,5 +1,5 @@
 //! Styles from TOML files. Built-in styles live in `themes/`, user styles in
-//! `~/.s3-viewer/themes/`. A style may `extends` another and override parts.
+//! `themes/` in the configuration folder. A style may `extends` another and override parts.
 
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime};
@@ -76,6 +76,25 @@ pub struct Colors {
     pub gutter_bg: Color,
     pub gutter_text: Color,
     pub image_bg: Color,
+    // Added in 2.1; optional so style files from older versions keep loading.
+    #[serde(default = "default_connected_bg")]
+    pub connected_bg: Color,
+    #[serde(default = "default_connected_text")]
+    pub connected_text: Color,
+    #[serde(default = "default_connected_line")]
+    pub connected_line: Color,
+}
+
+fn default_connected_bg() -> Color {
+    Color(Color32::from_rgb(0xbb, 0xf7, 0xd0))
+}
+
+fn default_connected_text() -> Color {
+    Color(Color32::from_rgb(0x14, 0x53, 0x2d))
+}
+
+fn default_connected_line() -> Color {
+    Color(Color32::from_rgb(0x4a, 0xde, 0x80))
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -457,6 +476,17 @@ mod tests {
         assert!(store.load("loop").unwrap_err().contains("loop"));
         assert!(store.load("badcolor").unwrap_err().contains("blue"));
         assert!(store.load("missing").is_err());
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn styles_without_newer_keys_still_load() {
+        let dir = scratch("older");
+        let mut old = Theme::builtin("light").to_toml();
+        old = old.lines().filter(|line| !line.starts_with("connected_")).collect::<Vec<_>>().join("\n");
+        std::fs::write(dir.join("old.toml"), old).unwrap();
+        let theme = ThemeStore::new(dir.clone()).load("old").unwrap();
+        assert_eq!(theme.colors.connected_bg, default_connected_bg());
         let _ = std::fs::remove_dir_all(dir);
     }
 

@@ -112,6 +112,8 @@ pub enum SortColumn {
 pub enum TransferKind {
     Download,
     Upload,
+    /// Counts objects instead of bytes.
+    Delete,
 }
 
 pub struct Transfer {
@@ -230,6 +232,7 @@ pub struct App {
 impl App {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let root = crate::settings::config_root();
+        crate::settings::import_legacy(&root);
         let settings = Settings::load(&root);
         i18n::set_language(Language::from_code(&settings.language));
         let themes = ThemeStore::new(root.join("themes"));
@@ -485,7 +488,7 @@ impl App {
         }
         self.dialog = Some(Dialog::Confirm {
             title: tr!("remove_connection_title"),
-            body: tr!("remove_connection_body", name = self.profile),
+            body: tr!("remove_connection_body", name = self.profile, path = crate::settings::display_path(&self.root)),
             action: Confirmed::RemoveProfile(self.profile.clone()),
         });
     }
@@ -966,6 +969,7 @@ impl App {
             self.set_status(match kind {
                 TransferKind::Download => tr!("download_cancelled"),
                 TransferKind::Upload => tr!("upload_cancelled"),
+                TransferKind::Delete => tr!("delete_cancelled"),
             });
             return;
         }
@@ -1125,6 +1129,94 @@ impl App {
             body: tr!("replace_body", names = names.join("\n")),
             action: Confirmed::Upload(plan),
         });
+    }
+
+    fn delete_selected(&mut self) {
+        let entries = self.selected_entries();
+        if !self.connected() || entries.is_empty() || self.transfer.is_some() {
+            return;
+        }
+        let mut names: Vec<String> = entries.iter().take(12).map(|entry| entry.name.clone()).collect();
+        if entries.len() > 12 {
+            names.push(tr!("replace_more", count = entries.len() - 12).trim_start().to_owned());
+        }
+        let mut body = tr!("delete_body", names = names.join("\n"));
+        if entries.iter().any(|entry| entry.is_folder) {
+            body += &tr!("delete_folders");
+        }
+        self.dialog = Some(Dialog::Confirm { title: tr!("delete"), body, action: Confirmed::Delete(entries) });
+    }
+
+    fn start_delete(&mut self, entries: Vec<ObjectEntry>) {
+        let Some(session) = self.session.clone() else { return };
+        let bucket = self.bucket.clone();
+        let folder = self.prefix.clone();
+        self.set_banner(None);
+        let (progress, cancel) = self.begin_transfer(TransferKind::Delete, 0);
+        self.submit(
+            Channel::Delete,
+            move || {
+                let (keys, capped) = keys_for_delete(&session, &bucket, &entries)?;
+                progress.set_total(keys.len().max(1) as u64);
+                let count = session.delete_keys(&bucket, &keys, &|amount| progress.add(amount), &cancel)?;
+                Ok((bucket, count, capped))
+            },
+            move |app, (bucket, count, capped)| {
+                let mut message = if count == 1 { tr!("deleted_one") } else { tr!("deleted_many", count = count) };
+                if capped {
+                    message += &tr!("list_capped", limit = MAX_LISTED);
+                }
+                app.set_banner(None);
+                app.set_status(message.clone());
+                if app.connected() && app.bucket == bucket && app.prefix == folder {
+                    app.nav_guard_until = Instant::now();
+                    app.status_after_listing = Some(message);
+                    app.open_prefix(folder);
+                }
+            },
+            |app, message| app.on_transfer_error(TransferKind::Delete, message),
+            true,
+        );
+    }
+
+    fn ask_new_folder(&mut self) {
+        if self.connected() && !self.bucket.is_empty() {
+            self.dialog = Some(Dialog::NewFolder { name: String::new(), error: None });
+        }
+    }
+
+    /// Creates the folder, or explains why the name does not work.
+    fn create_folder(&mut self, name: &str) -> Result<(), String> {
+        let key = transfer::folder_marker_key(&self.prefix, name)?;
+        let folder_name = key.trim_end_matches('/').rsplit('/').next().unwrap_or_default().to_owned();
+        let exists = self
+            .rows
+            .iter()
+            .filter_map(|row| row.entry.as_ref())
+            .any(|entry| entry.is_folder && entry.name == folder_name);
+        if exists {
+            return Err(tr!("new_folder_exists", name = folder_name));
+        }
+        let Some(session) = self.session.clone() else { return Ok(()) };
+        let bucket = self.bucket.clone();
+        let folder = self.prefix.clone();
+        self.submit(
+            Channel::NewFolder,
+            move || session.create_folder(&bucket, &key).map(|_| bucket),
+            move |app, bucket| {
+                let message = tr!("new_folder_created", name = folder_name);
+                app.set_banner(None);
+                app.set_status(message.clone());
+                if app.connected() && app.bucket == bucket && app.prefix == folder {
+                    app.nav_guard_until = Instant::now();
+                    app.status_after_listing = Some(message);
+                    app.open_prefix(folder);
+                }
+            },
+            |app, message| app.set_banner(Some(message)),
+            false,
+        );
+        Ok(())
     }
 
     fn start_upload(&mut self, plan: UploadPlan) {
@@ -1330,6 +1422,24 @@ fn fetch_tiff(
 }
 
 /// Downloads files and whole folders into `directory`, keeping the structure below `prefix`.
+/// Keys to delete for the selection: files as they are, folders with
+/// everything below them and their own placeholder object.
+fn keys_for_delete(session: &Session, bucket: &str, entries: &[ObjectEntry]) -> S3Result<(Vec<String>, bool)> {
+    let mut keys = Vec::new();
+    let mut capped = false;
+    for entry in entries {
+        if entry.is_folder {
+            let (found, entry_capped) = session.list_object_keys(bucket, &entry.key)?;
+            capped |= entry_capped;
+            keys.extend(found);
+            keys.push(if entry.key.ends_with('/') { entry.key.clone() } else { format!("{}/", entry.key) });
+        } else {
+            keys.push(entry.key.clone());
+        }
+    }
+    Ok((keys, capped))
+}
+
 fn download_many(
     session: &Session,
     bucket: &str,

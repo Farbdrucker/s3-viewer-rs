@@ -1,18 +1,64 @@
-//! Remembered form values and view options in `~/.s3-viewer/settings.json`.
-//! The secret key is never written here.
+//! Remembered form values and view options in `settings.json` in the
+//! configuration folder. The secret key is never written here.
 
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-/// `~/.s3-viewer`, or `$S3VIEWER_HOME` when set.
+/// The configuration folder, shared with the Python version:
+/// `~/.config/s3-viewer` (or `$XDG_CONFIG_HOME/s3-viewer`) on Linux,
+/// `~/Library/Application Support/s3-viewer` on macOS, `%APPDATA%\s3-viewer` on
+/// Windows. `$S3VIEWER_HOME` overrides it.
 pub fn config_root() -> PathBuf {
     if let Some(home) = std::env::var_os("S3VIEWER_HOME").filter(|value| !value.is_empty()) {
         return PathBuf::from(home);
     }
     directories::BaseDirs::new()
-        .map(|dirs| dirs.home_dir().join(".s3-viewer"))
+        .map(|dirs| dirs.config_dir().join("s3-viewer"))
         .unwrap_or_else(|| PathBuf::from(".s3-viewer"))
+}
+
+/// The configuration folder as shown in tooltips, with `~` for the home folder.
+pub fn display_path(path: &Path) -> String {
+    if cfg!(windows)
+        && let Some(appdata) = std::env::var_os("APPDATA")
+        && let Ok(rest) = path.strip_prefix(appdata)
+    {
+        return format!("%AppData%\\{}", rest.display());
+    }
+    match directories::BaseDirs::new().and_then(|dirs| path.strip_prefix(dirs.home_dir()).ok().map(Path::to_path_buf)) {
+        Some(rest) if !cfg!(windows) => format!("~/{}", rest.display()),
+        _ => path.display().to_string(),
+    }
+}
+
+/// Copies connections, settings and styles from the old `~/.s3-viewer` folder
+/// into `root` once, for files that do not exist there yet. The old folder stays.
+pub fn import_legacy(root: &Path) {
+    let Some(old) = directories::BaseDirs::new().map(|dirs| dirs.home_dir().join(".s3-viewer")) else { return };
+    import_from(&old, root);
+}
+
+fn import_from(old: &Path, root: &Path) {
+    if !old.is_dir() || old == root {
+        return;
+    }
+    let copy = |from: PathBuf, to: PathBuf| {
+        if from.is_file() && !to.exists() {
+            if let Some(parent) = to.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            let _ = std::fs::copy(&from, &to);
+        }
+    };
+    copy(old.join("connections.json"), root.join("connections.json"));
+    crate::profiles::restrict_private(root);
+    copy(old.join("settings.json"), root.join("settings.json"));
+    if let Ok(entries) = std::fs::read_dir(old.join("themes")) {
+        for entry in entries.flatten() {
+            copy(entry.path(), root.join("themes").join(entry.file_name()));
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -75,7 +121,7 @@ impl Settings {
         if let Ok(text) = std::fs::read_to_string(Self::path(root)) {
             return serde_json::from_str(&text).unwrap_or_default();
         }
-        legacy_qt_settings().unwrap_or_default()
+        legacy_qt_settings(root).unwrap_or_default()
     }
 
     pub fn save(&self, root: &Path) -> std::io::Result<()> {
@@ -88,10 +134,12 @@ impl Settings {
     }
 }
 
-/// `~/.config/s3viewer/S3Viewer.conf`, written by the PySide version.
-fn legacy_qt_settings() -> Option<Settings> {
-    let path = directories::BaseDirs::new()?.config_dir().join("s3viewer").join("S3Viewer.conf");
-    let text = std::fs::read_to_string(path).ok()?;
+/// Settings of the PySide version: `settings.ini` in the shared folder, or its
+/// older `~/.config/s3viewer/S3Viewer.conf`.
+fn legacy_qt_settings(root: &Path) -> Option<Settings> {
+    let old = directories::BaseDirs::new().map(|dirs| dirs.config_dir().join("s3viewer").join("S3Viewer.conf"));
+    let text =
+        std::iter::once(root.join("settings.ini")).chain(old).find_map(|path| std::fs::read_to_string(path).ok())?;
     Some(parse_qt_ini(&text))
 }
 
@@ -134,6 +182,33 @@ mod tests {
         assert_eq!(partial.endpoint, "x");
         assert_eq!(partial.geotiff_edge, 1024);
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn shows_home_as_tilde() {
+        let home = directories::BaseDirs::new().unwrap().home_dir().to_path_buf();
+        assert_eq!(display_path(&home.join(".config").join("s3-viewer")), "~/.config/s3-viewer");
+        assert_eq!(display_path(Path::new("/srv/x")), "/srv/x");
+    }
+
+    #[test]
+    fn imports_old_folder_without_overwriting() {
+        let base = std::env::temp_dir().join(format!("s3viewer-import-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let (old, root) = (base.join("old"), base.join("new"));
+        std::fs::create_dir_all(old.join("themes")).unwrap();
+        std::fs::write(old.join("connections.json"), "old").unwrap();
+        std::fs::write(old.join("settings.json"), "old").unwrap();
+        std::fs::write(old.join("themes").join("mine.toml"), "old").unwrap();
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("settings.json"), "new").unwrap();
+        import_from(&old, &root);
+        assert_eq!(std::fs::read_to_string(root.join("connections.json")).unwrap(), "old");
+        assert_eq!(std::fs::read_to_string(root.join("settings.json")).unwrap(), "new");
+        assert_eq!(std::fs::read_to_string(root.join("themes").join("mine.toml")).unwrap(), "old");
+        assert!(old.join("connections.json").exists(), "the old folder stays");
+        let _ = std::fs::remove_dir_all(base);
     }
 
     #[test]

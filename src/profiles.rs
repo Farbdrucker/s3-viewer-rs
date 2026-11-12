@@ -1,4 +1,4 @@
-//! Named connections in `~/.s3-viewer/connections.json`.
+//! Named connections in `connections.json` in the configuration folder.
 //!
 //! The file format is the one the Python version wrote, so saved
 //! connections carry over.
@@ -83,6 +83,14 @@ fn write_private(path: &Path, data: &[u8]) -> std::io::Result<()> {
 #[cfg(not(unix))]
 fn write_private(path: &Path, data: &[u8]) -> std::io::Result<()> {
     std::fs::write(path, data)
+}
+
+/// Makes the folder and its connection file readable only by the owner.
+pub fn restrict_private(root: &Path) {
+    restrict(root, 0o700);
+    if store_path(root).is_file() {
+        restrict(&store_path(root), 0o600);
+    }
 }
 
 #[cfg(unix)]
