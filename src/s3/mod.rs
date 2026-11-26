@@ -121,6 +121,11 @@ fn split_endpoint(url: &str) -> Option<Endpoint> {
     Some(Endpoint { scheme, authority, base_path: path })
 }
 
+/// `s3://bucket/key`, the form the AWS CLI, boto3, rclone and most S3 tools accept.
+pub fn s3_uri(bucket: &str, key: &str) -> String {
+    format!("s3://{bucket}/{key}")
+}
+
 pub fn host_of(url: &str) -> String {
     split_endpoint(url).map(|endpoint| endpoint.authority).unwrap_or_default()
 }
@@ -281,6 +286,18 @@ impl Session {
 
     pub fn host(&self) -> &str {
         &self.endpoint.authority
+    }
+
+    /// Plain (unsigned) HTTP URL of an object or folder, addressed the same way requests are.
+    /// It only opens without credentials when the object is public.
+    pub fn object_url(&self, bucket: &str, key: &str) -> String {
+        let base = &self.endpoint.base_path;
+        let (host, path) = if self.virtual_host(bucket) {
+            (format!("{bucket}.{}", self.endpoint.authority), format!("{base}/{key}"))
+        } else {
+            (self.endpoint.authority.clone(), format!("{base}/{bucket}/{key}"))
+        };
+        format!("{}://{host}{}", self.endpoint.scheme, sign::encode_path(&path))
     }
 
     // ---------------------------------------------------------------- requests
@@ -928,6 +945,21 @@ mod tests {
         assert!(validate_settings("h", "", "s", "", "", true, true, SignatureVersion::V4).is_err());
         assert!(validate_settings("h", "a", "s", "", "a b", true, true, SignatureVersion::V4).is_err());
         assert!(!format!("{ok:?}").contains("\"s\""));
+    }
+
+    #[test]
+    fn builds_object_addresses() {
+        let session = |endpoint: &str, path_style: bool| {
+            Session::new(validate_settings(endpoint, "a", "s", "", "", path_style, true, SignatureVersion::V4).unwrap())
+                .unwrap()
+        };
+        assert_eq!(s3_uri("data", "a b/c.tif"), "s3://data/a b/c.tif");
+        let path = session("https://s3.example.com:8443/base/", true);
+        assert_eq!(path.object_url("data", "a b/c.tif"), "https://s3.example.com:8443/base/data/a%20b/c.tif");
+        let virt = session("https://s3.example.com", false);
+        assert_eq!(virt.object_url("data", "dir/"), "https://data.s3.example.com/dir/");
+        // Bucket names with dots cannot be virtual hosts (TLS wildcard), so they stay in the path.
+        assert_eq!(virt.object_url("my.data", "x"), "https://s3.example.com/my.data/x");
     }
 
     #[test]

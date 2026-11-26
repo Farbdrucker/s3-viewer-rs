@@ -3,7 +3,7 @@
 use eframe::egui::{self, Align, Layout, RichText, Sense, Ui};
 use egui_extras::{Column, TableBuilder};
 
-use super::{App, SortColumn, TransferKind, widgets};
+use super::{App, CopyFormat, SortColumn, TransferKind, widgets};
 use crate::format::{format_dt, format_size};
 use crate::tr;
 
@@ -101,6 +101,10 @@ impl App {
                 {
                     self.download_selected();
                 }
+                if widgets::icon_button(ui, &theme, "🔗", &tr!("copy_tip"), has_selection).clicked() {
+                    let keys = self.keys_to_copy();
+                    self.copy_addresses(ui.ctx(), &keys, CopyFormat::S3Uri);
+                }
                 ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
                     egui::ScrollArea::horizontal().id_salt("crumbs").auto_shrink([false, true]).show(ui, |ui| {
                         ui.horizontal(|ui| self.crumbs_ui(ui));
@@ -164,14 +168,28 @@ impl App {
         }
         let last = crumbs.len() - 1;
         let mut open: Option<String> = None;
+        let mut copy: Option<(String, CopyFormat)> = None;
         for (index, (label, prefix)) in crumbs.into_iter().enumerate() {
             if index > 0 {
                 ui.label(widgets::muted(&theme, "/"));
             }
             let color = if index == last { theme.colors.crumb_current.0 } else { theme.colors.crumb.0 };
-            if ui.add(egui::Button::new(RichText::new(label).strong().color(color)).frame(false)).clicked() {
+            let response = ui.add(egui::Button::new(RichText::new(label).strong().color(color)).frame(false));
+            response.context_menu(|ui| {
+                let mut formats = vec![CopyFormat::S3Uri, CopyFormat::Url];
+                if !prefix.is_empty() {
+                    formats.insert(1, CopyFormat::Key);
+                }
+                if let Some(format) = copy_menu(ui, &formats) {
+                    copy = Some((prefix.clone(), format));
+                }
+            });
+            if response.clicked() {
                 open = Some(prefix);
             }
+        }
+        if let Some((prefix, format)) = copy {
+            self.copy_addresses(ui.ctx(), &[prefix], format);
         }
         if let Some(prefix) = open {
             self.open_crumb(prefix);
@@ -182,6 +200,7 @@ impl App {
         let theme = self.theme.clone();
         let row_height = theme.shape.row_height;
         let mut clicked: Option<(usize, bool)> = None;
+        let mut copy: Option<(Vec<String>, CopyFormat)> = None;
         let mut sort_by: Option<SortColumn> = None;
         let scroll_target = if std::mem::take(&mut self.scroll_to_current) {
             self.current_index().and_then(|index| visible.iter().position(|&v| v == index))
@@ -262,6 +281,20 @@ impl App {
                     }
                     let tip = entry.map(|entry| entry.key.clone()).unwrap_or_else(|| tr!("parent_folder"));
                     let response = row.response().on_hover_text(tip);
+                    if let Some(entry) = entry {
+                        response.context_menu(|ui| {
+                            let formats = [CopyFormat::S3Uri, CopyFormat::Key, CopyFormat::Url, CopyFormat::Name];
+                            if let Some(format) = copy_menu(ui, &formats) {
+                                // A right-click inside the selection copies the whole selection.
+                                let keys = if self.selected.contains(&entry.key) {
+                                    self.keys_to_copy()
+                                } else {
+                                    vec![entry.key.clone()]
+                                };
+                                copy = Some((keys, format));
+                            }
+                        });
+                    }
                     if response.double_clicked() {
                         clicked = Some((index, true));
                     } else if response.clicked() {
@@ -275,6 +308,9 @@ impl App {
         }
         if let Some((index, double)) = clicked {
             self.click_row(ui.ctx(), index, visible, double);
+        }
+        if let Some((keys, format)) = copy {
+            self.copy_addresses(ui.ctx(), &keys, format);
         }
     }
 
@@ -357,4 +393,26 @@ impl App {
             }
         });
     }
+}
+
+/// Entries of a "copy address" context menu; returns the chosen format once clicked.
+fn copy_menu(ui: &mut Ui, formats: &[CopyFormat]) -> Option<CopyFormat> {
+    let mut chosen = None;
+    for &format in formats {
+        let label = match format {
+            CopyFormat::S3Uri => tr!("copy_s3_uri"),
+            CopyFormat::Key => tr!("copy_key"),
+            CopyFormat::Url => tr!("copy_url"),
+            CopyFormat::Name => tr!("copy_name"),
+        };
+        let mut response = ui.button(label);
+        if format == CopyFormat::Url {
+            response = response.on_hover_text(tr!("copy_url_tip"));
+        }
+        if response.clicked() {
+            chosen = Some(format);
+            ui.close();
+        }
+    }
+    chosen
 }
