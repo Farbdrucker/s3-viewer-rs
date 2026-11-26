@@ -110,6 +110,19 @@ pub enum SortColumn {
     Modified,
 }
 
+/// What "copy address" puts on the clipboard for an object or folder.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CopyFormat {
+    /// `s3://bucket/key`
+    S3Uri,
+    /// The key alone, i.e. the path inside the bucket.
+    Key,
+    /// Unsigned `https://…` URL through the endpoint.
+    Url,
+    /// The last path segment.
+    Name,
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum TransferKind {
     Download,
@@ -966,6 +979,44 @@ impl App {
         }
     }
 
+    /// One address per line, in the order given. Works for folders too (their key ends in `/`).
+    fn copy_addresses(&mut self, ctx: &egui::Context, keys: &[String], format: CopyFormat) {
+        if keys.is_empty() || self.bucket.is_empty() {
+            return;
+        }
+        let lines: Vec<String> = keys
+            .iter()
+            .map(|key| match format {
+                CopyFormat::S3Uri => crate::s3::s3_uri(&self.bucket, key),
+                CopyFormat::Key => key.clone(),
+                CopyFormat::Url => match &self.session {
+                    Some(session) => session.object_url(&self.bucket, key),
+                    None => crate::s3::s3_uri(&self.bucket, key),
+                },
+                CopyFormat::Name => {
+                    let trimmed = key.trim_end_matches('/');
+                    let name = trimmed.rsplit('/').next().unwrap_or(trimmed);
+                    if key.ends_with('/') { format!("{name}/") } else { name.to_owned() }
+                }
+            })
+            .collect();
+        let status = match lines.as_slice() {
+            [one] => tr!("copied_one", text = one),
+            many => tr!("copied_many", count = many.len()),
+        };
+        ctx.copy_text(lines.join("\n"));
+        self.flash_status(status, Duration::from_secs(4));
+    }
+
+    /// Keys of the selected entries in display order; falls back to the current entry.
+    fn keys_to_copy(&self) -> Vec<String> {
+        let selected: Vec<String> = self.selected_entries().into_iter().map(|entry| entry.key).collect();
+        if !selected.is_empty() {
+            return selected;
+        }
+        self.current.iter().filter(|key| !key.is_empty()).cloned().collect()
+    }
+
     fn start_editing(&mut self) {
         if let PreviewContent::Text(preview) = &self.preview.content
             && preview.editable()
@@ -1329,10 +1380,11 @@ impl App {
             return;
         }
         let typing = ctx.egui_wants_keyboard_input();
-        let (f5, find, select_all, enter, backspace, up, down) = ctx.input_mut(|input| {
+        let (f5, find, copy_uri, select_all, enter, backspace, up, down) = ctx.input_mut(|input| {
             (
                 input.consume_key(egui::Modifiers::NONE, egui::Key::F5),
                 input.consume_key(egui::Modifiers::COMMAND, egui::Key::F),
+                !typing && input.consume_key(egui::Modifiers::COMMAND | egui::Modifiers::SHIFT, egui::Key::C),
                 !typing && input.consume_key(egui::Modifiers::COMMAND, egui::Key::A),
                 !typing && input.key_pressed(egui::Key::Enter),
                 !typing && input.key_pressed(egui::Key::Backspace),
@@ -1348,6 +1400,10 @@ impl App {
         }
         if self.rows.is_empty() {
             return;
+        }
+        if copy_uri {
+            let keys = self.keys_to_copy();
+            self.copy_addresses(ctx, &keys, CopyFormat::S3Uri);
         }
         if select_all {
             self.selected = self

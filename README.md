@@ -44,6 +44,10 @@ first time with right-click → Open).
   (arrows, Enter, Backspace, F5, Ctrl+F, Ctrl+A). A click selects and previews, a
   double-click opens a folder. New folders can be created. Listings are capped at 5000 entries;
   endpoints without ListObjectsV2 fall back to ListObjects.
+- **Copy addresses**: right-click a file or folder (or a part of the path) to copy its
+  S3 URI (`s3://bucket/path/file.tif`), its path in the bucket, its HTTP URL through the
+  endpoint (opens without credentials only for public objects) or its name. The 🔗 button
+  and Ctrl+Shift+C (Cmd+Shift+C on macOS) copy the S3 URIs of the selection, one per line.
 - **Preview** (docked left or right, or in its own window):
   - text with line numbers; JSON and XML pretty-printed; JSON/NDJSON/GeoJSON, YAML,
     XML/HTML/SVG highlighted; first 1 MB of large files
